@@ -245,7 +245,7 @@ Temperature thermalManager;
       int16_t Temperature::maxtemp_raw_CHAMBER = HEATER_CHAMBER_RAW_HI_TEMP;
     #endif
     #if WATCH_CHAMBER
-      heater_watch_t Temperature::watch_chamber = { 0 };
+      heater_watch_t Temperature::watch_chamber{0};
     #endif
     millis_t Temperature::next_chamber_check_ms;
   #endif // HAS_HEATED_CHAMBER
@@ -301,10 +301,6 @@ volatile bool Temperature::temp_meas_ready = false;
   millis_t Temperature::preheat_end_time[HOTENDS] = { 0 };
 #endif
 
-#if ENABLED(FILAMENT_WIDTH_SENSOR)
-  int8_t Temperature::meas_shift_index;  // Index of a delayed sample in buffer
-#endif
-
 #if HAS_AUTO_FAN
   millis_t Temperature::next_auto_fan_check_ms = 0;
 #endif
@@ -312,10 +308,6 @@ volatile bool Temperature::temp_meas_ready = false;
 #if ENABLED(FAN_SOFT_PWM)
   uint8_t Temperature::soft_pwm_amount_fan[FAN_COUNT],
           Temperature::soft_pwm_count_fan[FAN_COUNT];
-#endif
-
-#if ENABLED(FILAMENT_WIDTH_SENSOR)
-  uint16_t Temperature::current_raw_filwidth = 0; // Measured filament diameter - one extruder only
 #endif
 
 #if ENABLED(PROBING_HEATERS_OFF)
@@ -508,7 +500,7 @@ volatile bool Temperature::temp_meas_ready = false;
 
       // Did the temperature overshoot very far?
       #ifndef MAX_OVERSHOOT_PID_AUTOTUNE
-        #define MAX_OVERSHOOT_PID_AUTOTUNE 20
+        #define MAX_OVERSHOOT_PID_AUTOTUNE 30
       #endif
       if (current_temp > target + MAX_OVERSHOOT_PID_AUTOTUNE) {
         SERIAL_ECHOLNPGM(MSG_PID_TEMP_TOO_HIGH);
@@ -673,10 +665,10 @@ int16_t Temperature::getHeaterPower(const heater_ind_t heater_id) {
         , AUTO_2_IS_0 ? 0 : AUTO_2_IS_1 ? 1 : 2
       #endif
       #if HOTENDS > 3
-        , AUTO_3_IS_0 ? 0 : AUTO_3_IS_1 ? 1 : AUTO_3_IS_2 ? 2 : 3,
+        , AUTO_3_IS_0 ? 0 : AUTO_3_IS_1 ? 1 : AUTO_3_IS_2 ? 2 : 3
       #endif
       #if HOTENDS > 4
-        , AUTO_4_IS_0 ? 0 : AUTO_4_IS_1 ? 1 : AUTO_4_IS_2 ? 2 : AUTO_4_IS_3 ? 3 : 4,
+        , AUTO_4_IS_0 ? 0 : AUTO_4_IS_1 ? 1 : AUTO_4_IS_2 ? 2 : AUTO_4_IS_3 ? 3 : 4
       #endif
       #if HOTENDS > 5
         , AUTO_5_IS_0 ? 0 : AUTO_5_IS_1 ? 1 : AUTO_5_IS_2 ? 2 : AUTO_5_IS_3 ? 3 : AUTO_5_IS_4 ? 4 : 5
@@ -829,7 +821,6 @@ void Temperature::min_temp_error(const heater_ind_t heater) {
     #endif
     E_UNUSED();
     const uint8_t ee = HOTEND_INDEX;
-    float pid_output;
     #if ENABLED(PIDTEMP)
       #if DISABLED(PID_OPENLOOP)
         static hotend_pid_t work_pid[HOTENDS];
@@ -837,6 +828,8 @@ void Temperature::min_temp_error(const heater_ind_t heater) {
                      temp_dState[HOTENDS] = { 0 };
         static bool pid_reset[HOTENDS] = { false };
         const float pid_error = temp_hotend[ee].target - temp_hotend[ee].celsius;
+
+        float pid_output;
 
         if (temp_hotend[ee].target == 0
           || pid_error < -(PID_FUNCTIONAL_RANGE)
@@ -922,7 +915,7 @@ void Temperature::min_temp_error(const heater_ind_t heater) {
       #else
         #define _TIMED_OUT_TEST false
       #endif
-      pid_output = (!_TIMED_OUT_TEST && temp_hotend[ee].celsius < temp_hotend[ee].target) ? BANG_MAX : 0;
+      const float pid_output = (!_TIMED_OUT_TEST && temp_hotend[ee].celsius < temp_hotend[ee].target) ? BANG_MAX : 0;
       #undef _TIMED_OUT_TEST
 
     #endif
@@ -938,7 +931,7 @@ void Temperature::min_temp_error(const heater_ind_t heater) {
 
     #if DISABLED(PID_OPENLOOP)
 
-      static PID_t work_pid = { 0 };
+      static PID_t work_pid{0};
       static float temp_iState = 0, temp_dState = 0;
       static bool pid_reset = true;
       float pid_output = 0;
@@ -1082,16 +1075,11 @@ void Temperature::manage_heater() {
 
   #if ENABLED(FILAMENT_WIDTH_SENSOR)
     /**
-     * Filament Width Sensor dynamically sets the volumetric multiplier
-     * based on a delayed measurement of the filament diameter.
+     * Dynamically set the volumetric multiplier based
+     * on the delayed Filament Width measurement.
      */
-    if (filament_sensor) {
-      meas_shift_index = filwidth_delay_index[0] - meas_delay_cm;
-      if (meas_shift_index < 0) meas_shift_index += MAX_MEASUREMENT_DELAY + 1;  //loop around buffer if needed
-      LIMIT(meas_shift_index, 0, MAX_MEASUREMENT_DELAY);
-      planner.calculate_volumetric_for_width_sensor(measurement_delay[meas_shift_index]);
-    }
-  #endif // FILAMENT_WIDTH_SENSOR
+    filwidth.update_volumetric();
+  #endif
 
   #if HAS_HEATED_BED
 
@@ -1333,13 +1321,14 @@ void Temperature::manage_heater() {
 
     if (!WITHIN(t_index, 0, COUNT(user_thermistor) - 1)) return 25;
 
-    if (user_thermistor[t_index].pre_calc) {
-      // pre-calculate some variables
-      user_thermistor[t_index].pre_calc = false;
-      user_thermistor[t_index].res_25_recip = 1.0f / user_thermistor[t_index].res_25;
-      user_thermistor[t_index].res_25_log = logf(user_thermistor[t_index].res_25);
-      user_thermistor[t_index].beta_recip = 1.0f / user_thermistor[t_index].beta;
-      user_thermistor[t_index].sh_alpha = (1.0f / (THERMISTOR_RESISTANCE_NOMINAL_C - THERMISTOR_ABS_ZERO_C)) - (user_thermistor[t_index].beta_recip * user_thermistor[t_index].res_25_log) - (user_thermistor[t_index].sh_c_coeff * user_thermistor[t_index].res_25_log * user_thermistor[t_index].res_25_log * user_thermistor[t_index].res_25_log);
+    user_thermistor_t &t = user_thermistor[t_index];
+    if (t.pre_calc) { // pre-calculate some variables
+      t.pre_calc     = false;
+      t.res_25_recip = 1.0f / t.res_25;
+      t.res_25_log   = logf(t.res_25);
+      t.beta_recip   = 1.0f / t.beta;
+      t.sh_alpha     = RECIPROCAL(THERMISTOR_RESISTANCE_NOMINAL_C - (THERMISTOR_ABS_ZERO_C))
+                        - (t.beta_recip * t.res_25_log) - (t.sh_c_coeff * cu(t.res_25_log));
     }
 
     // maximum adc value .. take into account the over sampling
@@ -1347,13 +1336,13 @@ void Temperature::manage_heater() {
               adc_raw = constrain(raw, 1, adc_max - 1); // constrain to prevent divide-by-zero
 
     const float adc_inverse = (adc_max - adc_raw) - 0.5f,
-                resistance = user_thermistor[t_index].series_res * (adc_raw + 0.5f) / adc_inverse,
+                resistance = t.series_res * (adc_raw + 0.5f) / adc_inverse,
                 log_resistance = logf(resistance);
 
-    float value = user_thermistor[t_index].sh_alpha;
-    value += log_resistance * user_thermistor[t_index].beta_recip;
-    if (user_thermistor[t_index].sh_c_coeff != 0)
-      value += user_thermistor[t_index].sh_c_coeff * log_resistance * log_resistance * log_resistance;
+    float value = t.sh_alpha;
+    value += log_resistance * t.beta_recip;
+    if (t.sh_c_coeff != 0)
+      value += t.sh_c_coeff * cu(log_resistance);
     value = 1.0f / value;
 
     //#if (MOTHERBOARD == BOARD_RAMPS_14_EFB)
@@ -1526,7 +1515,7 @@ void Temperature::updateTemperaturesFromRawValues() {
     redundant_temperature = analog_to_celsius_hotend(redundant_temperature_raw, 1);
   #endif
   #if ENABLED(FILAMENT_WIDTH_SENSOR)
-    filament_width_meas = analog_to_mm_fil_width();
+    filwidth.update_measured_mm();
   #endif
 
   #if ENABLED(USE_WATCHDOG)
@@ -1536,30 +1525,6 @@ void Temperature::updateTemperaturesFromRawValues() {
 
   temp_meas_ready = false;
 }
-
-
-#if ENABLED(FILAMENT_WIDTH_SENSOR)
-
-  // Convert raw Filament Width to millimeters
-  float Temperature::analog_to_mm_fil_width() {
-    return current_raw_filwidth * 5.0f * (1.0f / 16383.0f);
-  }
-
-  /**
-   * Convert Filament Width (mm) to a simple ratio
-   * and reduce to an 8 bit value.
-   *
-   * A nominal width of 1.75 and measured width of 1.73
-   * gives (100 * 1.75 / 1.73) for a ratio of 101 and
-   * a return value of 1.
-   */
-  int8_t Temperature::widthFil_to_size_ratio() {
-    if (ABS(filament_width_nominal - filament_width_meas) <= FILWIDTH_ERROR_MARGIN)
-      return int(100.0f * filament_width_nominal / filament_width_meas) - 100;
-    return 0;
-  }
-
-#endif
 
 #if MAX6675_SEPARATE_SPI
   SPIclass<MAX6675_DO_PIN, MOSI_PIN, MAX6675_SCK_PIN> max6675_spi;
@@ -2241,10 +2206,6 @@ void Temperature::set_current_temp_raw() {
   temp_meas_ready = true;
 }
 
-#if ENABLED(FILAMENT_WIDTH_SENSOR)
-  uint32_t raw_filwidth_value; // = 0
-#endif
-
 void Temperature::readings_ready() {
 
   // Update the raw values if they've been read. Else we could be updating them during reading.
@@ -2252,7 +2213,7 @@ void Temperature::readings_ready() {
 
   // Filament Sensor - can be read any time since IIR filtering is used
   #if ENABLED(FILAMENT_WIDTH_SENSOR)
-    current_raw_filwidth = raw_filwidth_value >> 10;  // Divide to get to 0-16384 range since we used 1/128 IIR filter approach
+    filwidth.reading_ready();
   #endif
 
   #if HOTENDS
@@ -2781,10 +2742,8 @@ void Temperature::isr() {
       case Measure_FILWIDTH:
         if (!HAL_ADC_READY())
           next_sensor_state = adc_sensor_state; // redo this state
-        else if (HAL_READ_ADC() > 102) { // Make sure ADC is reading > 0.5 volts, otherwise don't read.
-          raw_filwidth_value -= raw_filwidth_value >> 7; // Subtract 1/128th of the raw_filwidth_value
-          raw_filwidth_value += uint32_t(HAL_READ_ADC()) << 7; // Add new ADC reading, scaled by 128
-        }
+        else
+          filwidth.accumulate(HAL_READ_ADC());
       break;
     #endif
 
@@ -2974,11 +2933,14 @@ void Temperature::isr() {
   #if HOTENDS && HAS_DISPLAY
     void Temperature::set_heating_message(const uint8_t e) {
       const bool heating = isHeatingHotend(e);
-      #if HOTENDS > 1
-        ui.status_printf_P(0, heating ? PSTR("E%c " MSG_HEATING) : PSTR("E%c " MSG_COOLING), '1' + e);
-      #else
-        ui.set_status_P(heating ? PSTR("E " MSG_HEATING) : PSTR("E " MSG_COOLING));
-      #endif
+      ui.status_printf_P(0,
+        #if HOTENDS > 1
+          PSTR("E%c " S_FMT), '1' + e
+        #else
+          PSTR("E " S_FMT)
+        #endif
+        , heating ? PSTR(MSG_HEATING) : PSTR(MSG_COOLING)
+      );
     }
   #endif
 
