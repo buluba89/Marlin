@@ -652,9 +652,9 @@
  *          TMC5130, TMC5130_STANDALONE, TMC5160, TMC5160_STANDALONE
  * :['A4988', 'A5984', 'DRV8825', 'LV8729', 'L6470', 'TB6560', 'TB6600', 'TMC2100', 'TMC2130', 'TMC2130_STANDALONE', 'TMC2160', 'TMC2160_STANDALONE', 'TMC2208', 'TMC2208_STANDALONE', 'TMC2209', 'TMC2209_STANDALONE', 'TMC26X', 'TMC26X_STANDALONE', 'TMC2660', 'TMC2660_STANDALONE', 'TMC5130', 'TMC5130_STANDALONE', 'TMC5160', 'TMC5160_STANDALONE']
  */
-//#define X_DRIVER_TYPE  A4988
-//#define Y_DRIVER_TYPE  A4988
-//#define Z_DRIVER_TYPE  A4988
+#define X_DRIVER_TYPE  TMC2208_STANDALONE
+#define Y_DRIVER_TYPE  TMC2208_STANDALONE
+#define Z_DRIVER_TYPE  TMC2208_STANDALONE
 //#define X2_DRIVER_TYPE A4988
 //#define Y2_DRIVER_TYPE A4988
 //#define Z2_DRIVER_TYPE A4988
@@ -716,7 +716,7 @@
  * Override with M203
  *                                      X, Y, Z, E0 [, E1[, E2[, E3[, E4[, E5]]]]]
  */
-#define DEFAULT_MAX_FEEDRATE          { 500, 500, 5, 60 }
+#define DEFAULT_MAX_FEEDRATE          { 300, 300, 5, 60 }
 
 /**
  * Default Max Acceleration (change/s) change = mm/s
@@ -724,7 +724,7 @@
  * Override with M201
  *                                      X, Y, Z, E0 [, E1[, E2[, E3[, E4[, E5]]]]]
  */
-#define DEFAULT_MAX_ACCELERATION      { 500, 500, 100, 5000 }
+#define DEFAULT_MAX_ACCELERATION      { 500, 500, 100, 3000 }
 
 /**
  * Default Acceleration (change/s) change = mm/s
@@ -734,9 +734,9 @@
  *   M204 R    Retract Acceleration
  *   M204 T    Travel Acceleration
  */
-#define DEFAULT_ACCELERATION          1000    // X, Y, Z and E acceleration for printing moves
+#define DEFAULT_ACCELERATION          200    // X, Y, Z and E acceleration for printing moves
 #define DEFAULT_RETRACT_ACCELERATION  2000    // E acceleration for retracts
-#define DEFAULT_TRAVEL_ACCELERATION   1000    // X, Y, Z acceleration for travel (non printing) moves
+#define DEFAULT_TRAVEL_ACCELERATION   500    // X, Y, Z acceleration for travel (non printing) moves
 
 /**
  * Junction Deviation
@@ -881,11 +881,10 @@
 
 /**
  * Z Probe to nozzle (X,Y) offset, relative to (0, 0).
- * X and Y offsets must be integers.
  *
  * In the following example the X and Y offsets are both positive:
- * #define X_PROBE_OFFSET_FROM_EXTRUDER 10
- * #define Y_PROBE_OFFSET_FROM_EXTRUDER 10
+ *
+ *   #define NOZZLE_TO_PROBE_OFFSET { 10, 10, 0 }
  *
  *     +-- BACK ---+
  *     |           |
@@ -897,10 +896,10 @@
  *     |           |
  *     O-- FRONT --+
  *   (0,0)
+ *
+ * Specify a Probe position as { X, Y, Z }
  */
-#define X_PROBE_OFFSET_FROM_EXTRUDER -42    // X offset: -left  +right  [of the nozzle]
-#define Y_PROBE_OFFSET_FROM_EXTRUDER   0    // Y offset: -front +behind [the nozzle]
-#define Z_PROBE_OFFSET_FROM_EXTRUDER  -1.85  // Z offset: -below +above  [the nozzle]
+#define NOZZLE_TO_PROBE_OFFSET { -45, 0, -2.15 }
 
 // Certain types of probes need to stay away from edges
 #define MIN_PROBE_EDGE 10
@@ -999,9 +998,9 @@
 // @section machine
 
 // Invert the stepper direction. Change (or reverse the motor connector) if an axis goes the wrong way.
-#define INVERT_X_DIR true
-#define INVERT_Y_DIR true
-#define INVERT_Z_DIR false
+#define INVERT_X_DIR false
+#define INVERT_Y_DIR false
+#define INVERT_Z_DIR true
 
 // @section extruder
 
